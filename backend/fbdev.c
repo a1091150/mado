@@ -117,6 +117,11 @@ void video_sync(int fb_fd, unsigned char *mem_start)
 static bool twin_fbdev_work(void *closure)
 {
     twin_screen_t *screen = SCREEN(closure);
+    static bool run_once = true;
+    if (run_once) {
+        run_once = false;
+        twin_screen_damage(screen, 0, 0, screen->width, screen->height);
+    }
 
     if (twin_screen_damaged(screen))
         twin_screen_update(screen);
