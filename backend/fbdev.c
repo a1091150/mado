@@ -22,6 +22,7 @@
 #define FBDEV_DEFAULT "/dev/fb0"
 #define SCREEN(x) ((twin_context_t *) x)->screen
 #define PRIV(x) ((twin_fbdev_t *) ((twin_context_t *) x)->priv)
+#define FBIO_CACHE_SYNC 0x4630
 
 typedef struct {
     twin_screen_t *screen;
@@ -79,12 +80,50 @@ static void twin_fbdev_damage(twin_screen_t *screen, twin_fbdev_t *tx)
     twin_screen_damage(tx->screen, 0, 0, width, height);
 }
 
+void sync_cache(int fb_fd, unsigned char *mem_start)
+{
+    if (fb_fd < 0)
+        return;
+    const unsigned int pitch = 4 * 854;
+    const unsigned int y = 0;
+    const unsigned int h = 480;
+    const unsigned int w = 854;
+
+    unsigned int args[2];
+    unsigned int dirty_rect_vir_addr_begin = (unsigned int) (mem_start);
+    unsigned int dirty_rect_vir_addr_end =
+        (unsigned int) (mem_start + pitch * (y + h));
+    args[0] = dirty_rect_vir_addr_begin;
+    args[1] = dirty_rect_vir_addr_end;
+    ioctl(fb_fd, FBIO_CACHE_SYNC, args);
+}
+
+/* seed msg to fb driver to call pan_disp */
+void video_sync(int fb_fd, unsigned char *mem_start)
+{
+    struct fb_var_screeninfo var;
+    ioctl(fb_fd, FBIOGET_VSCREENINFO, &var);
+
+    sync_cache(fb_fd, mem_start);
+
+    var.yoffset = 0;
+    var.reserved[0] = 0;
+    var.reserved[1] = 0;
+    var.reserved[2] = 854;
+    var.reserved[3] = 480;
+    ioctl(fb_fd, FBIOPAN_DISPLAY, &var);
+}
+
 static bool twin_fbdev_work(void *closure)
 {
     twin_screen_t *screen = SCREEN(closure);
 
     if (twin_screen_damaged(screen))
         twin_screen_update(screen);
+
+    twin_context_t *ctx = (twin_context_t *) closure;
+    twin_fbdev_t *tx = ctx->priv;
+    video_sync(tx->fb_fd, tx->fb_base);
     return true;
 }
 
@@ -221,6 +260,7 @@ twin_context_t *twin_fbdev_init(int width, int height)
     }
 
     /* Create TWIN screen */
+    twin_fbdev_get_screen_size(tx, &width, &height);
     ctx->screen =
         twin_screen_create(width, height, NULL, _twin_fbdev_put_span, ctx);
 
