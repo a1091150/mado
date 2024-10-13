@@ -108,6 +108,7 @@ ifeq ($(CONFIG_BACKEND_FBDEV), y)
 BACKEND = fbdev
 libtwin.a_files-y += backend/fbdev.c
 libtwin.a_files-y += backend/linux_input.c
+CFLAGS += -pthread
 endif
 
 # Standalone application
