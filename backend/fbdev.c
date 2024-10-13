@@ -57,9 +57,8 @@ static void _twin_fbdev_put_span(twin_coord_t left,
         return;
 
     twin_coord_t width = right - left;
-    off_t off = top * screen->width + left;
-    uint32_t *dest =
-        (uint32_t *) ((uintptr_t) tx->fb_base + (off * sizeof(uint32_t)));
+    unsigned char *dest =
+        (unsigned char *) tx->fb_base + tx->fb_fix.line_length * top + 4 * left;
     memcpy(dest, pixels, width * sizeof(uint32_t));
 }
 
